@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>فاحص التشابه والاقتباس الداخلي للأبحاث | Cross-Similarity Checker</title>
+    <!-- Google Fonts: Cairo for Arabic & Outfit for English -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <!-- Top Navigation -->
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-layer-group"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>فاحص الاقتباس الداخلي للأبحاث</h1>
+                    <span class="subtitle">Internal Cross-Similarity & Plagiarism Detector</span>
+                </div>
+            </div>
+
+            <div class="nav-actions">
+                <button id="langToggleBtn" class="btn btn-secondary btn-sm" onclick="toggleLanguage()">
+                    <i class="fa-solid fa-globe"></i> <span id="langText">English</span>
+                </button>
+                <button id="excelExportBtn" class="btn btn-success btn-sm" onclick="exportExcel()" style="display: none;">
+                    <i class="fa-solid fa-file-excel"></i> <span data-i18n="export_excel">تصدير تقرير Excel</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-content">
+        <!-- Input / Scan Section -->
+        <section class="card input-section">
+            <div class="card-header">
+                <h2><i class="fa-solid fa-folder-open"></i> <span data-i18n="input_title">اختيار أو رفع الأبحاث للفحص</span></h2>
+                <div class="header-badges">
+                    <span class="badge badge-info"><i class="fa-solid fa-shield-halved"></i> Turnitin Algorithm Simulation</span>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <div class="input-tabs">
+                    <button class="tab-btn active" onclick="switchInputMode('folder')">
+                        <i class="fa-solid fa-hard-drive"></i> <span data-i18n="scan_folder_tab">فحص مجلد على الجهاز</span>
+                    </button>
+                    <button class="tab-btn" onclick="switchInputMode('upload')">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> <span data-i18n="upload_files_tab">رفع ملفات (سحب وإفلات)</span>
+                    </button>
+                </div>
+
+                <!-- Mode 1: Local Folder -->
+                <div id="folderMode" class="input-mode-panel active">
+                    <div class="form-group-inline">
+                        <div class="input-with-icon flex-grow">
+                            <i class="fa-solid fa-folder"></i>
+                            <input type="text" id="folderPathInput" class="form-control" value="d:\similarity\test" placeholder="أدخل مسار المجلد على جهازك (مثال: D:\research_batch)">
+                        </div>
+                        <button class="btn btn-primary" id="scanFolderBtn" onclick="startFolderScan()">
+                            <i class="fa-solid fa-magnifying-glass-chart"></i> <span data-i18n="scan_now">فحص المجلد الآن</span>
+                        </button>
+                    </div>
+                    <p class="help-text">
+                        <i class="fa-solid fa-circle-info"></i>
+                        <span data-i18n="scan_help">يدعم فحص كل ملفات Word (.docx) و PDF و TXT في المجلد دفعة واحدة ومقارنة كل بحث بالباقي.</span>
+                    </p>
+                </div>
+
+                <!-- Mode 2: Drag & Drop Upload -->
+                <div id="uploadMode" class="input-mode-panel">
+                    <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+                        <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
+                        <h3 data-i18n="drop_title">اسحب وأفلت ملفات الأبحاث هنا</h3>
+                        <p data-i18n="drop_subtitle">أو اضغط لاختيار ملفات من جهازك (DOCX, PDF, TXT)</p>
+                        <input type="file" id="fileInput" multiple accept=".docx,.pdf,.txt" style="display: none;" onchange="handleFileSelect(event)">
+                        <div id="selectedFilesSummary" class="selected-files-summary"></div>
+                    </div>
+                    <div class="upload-action text-center mt-3">
+                        <button class="btn btn-primary" id="startUploadBtn" onclick="startFileUpload()" style="display: none;">
+                            <i class="fa-solid fa-play"></i> <span data-i18n="start_analysis">بدء الفحص للملفات المحددة</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Advanced Settings Accordion -->
+                <div class="settings-toggle" onclick="toggleSettings()">
+                    <span><i class="fa-solid fa-sliders"></i> <span data-i18n="settings_title">إعدادات خوارزمية الفحص (اختياري)</span></span>
+                    <i class="fa-solid fa-chevron-down" id="settingsChevron"></i>
+                </div>
+                <div class="settings-panel" id="settingsPanel">
+                    <div class="settings-grid">
+                        <div class="setting-item">
+                            <label><span data-i18n="min_words_label">الحد الأدنى لكلمات الجملة المتطابقة:</span> <b id="minWordsVal">8</b> كلمات (معيار Turnitin)</label>
+                            <input type="range" id="minWordsRange" min="3" max="15" value="8" oninput="document.getElementById('minWordsVal').innerText = this.value">
+                            <span class="setting-desc">معيار Turnitin الافتراضي هو 8 كلمات لمنع احتساب العبارات الشائعة كسرقة علمية.</span>
+                        </div>
+                        <div class="setting-item">
+                            <label><span data-i18n="fuzzy_label">حساسية التطابق الجزئي (Fuzzy Matching):</span> <b id="fuzzyVal">75</b>%</label>
+                            <input type="range" id="fuzzyRange" min="60" max="95" value="75" oninput="document.getElementById('fuzzyVal').innerText = this.value">
+                            <span class="setting-desc">اكتشاف الجمل التي تم تغيير كلمة أو كلمتين فيها (إعادة صياغة جزئية).</span>
+                        </div>
+                        <div class="setting-item checkbox-item">
+                            <label class="custom-checkbox">
+                                <input type="checkbox" id="excludeRefCheck" checked>
+                                <span class="checkmark"></span>
+                                <span data-i18n="exclude_ref_label">استبعاد قسم المراجع (References / Bibliography)</span>
+                            </label>
+                            <span class="setting-desc">مثل Turnitin لمنع احتساب المراجع المشتركة كسرقة علمية.</span>
+                        </div>
+                        <div class="setting-item checkbox-item">
+                            <label class="custom-checkbox">
+                                <input type="checkbox" id="crossLingualCheck" checked>
+                                <span class="checkmark"></span>
+                                <span data-i18n="cross_lingual_label">كشف الاقتباس المترجم (عربي ↔ إنجليزي) والدلالي (Semantic AI)</span>
+                            </label>
+                            <span class="setting-desc">اكتشاف النصوص المترجمة وإعادة الصياغة العميقة باستخدام نماذج الذكاء الاصطناعي متعدد اللغات.</span>
+                        </div>
+                        <div class="setting-item checkbox-item">
+                            <label class="custom-checkbox">
+                                <input type="checkbox" id="checkInternetCheck" checked>
+                                <span class="checkmark"></span>
+                                <span data-i18n="check_internet_label">فحص مصادر الإنترنت المفتوحة (Live Web Search)</span>
+                            </label>
+                            <span class="setting-desc">مقارنة العبارات المفتاحية بمحركات البحث والويكيبيديا والمقالات المنشورة على الويب.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Loading Indicator -->
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="spinner"></div>
+            <h3 id="loadingText" data-i18n="analyzing">جاري استخراج النصوص وفحص التشابه المتبادل بين الأبحاث...</h3>
+            <p data-i18n="loading_sub">يتم فحص الجمل وحساب مصفوفة التقاطع بالكامل</p>
+        </div>
+
+        <!-- Results Dashboard Section -->
+        <section id="resultsSection" class="results-section" style="display: none;">
+            <!-- Stats Row -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon icon-primary"><i class="fa-solid fa-file-lines"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label" data-i18n="total_docs">إجمالي الأبحاث المفحوصة</span>
+                        <h3 id="statTotalDocs" class="stat-value">0</h3>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon icon-danger"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label" data-i18n="high_risk">أبحاث عالية الخطورة (>25%)</span>
+                        <h3 id="statHighRisk" class="stat-value text-danger">0</h3>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon icon-warning"><i class="fa-solid fa-circle-exclamation"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label" data-i18n="moderate_risk">أبحاث متوسطة الخطورة (15-25%)</span>
+                        <h3 id="statModRisk" class="stat-value text-warning">0</h3>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon icon-success"><i class="fa-solid fa-circle-check"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label" data-i18n="safe_docs">أبحاث آمنة للتسليم (<15%)</span>
+                        <h3 id="statSafeDocs" class="stat-value text-success">0</h3>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon icon-info"><i class="fa-solid fa-chart-pie"></i></div>
+                    <div class="stat-content">
+                        <span class="stat-label" data-i18n="avg_sim">متوسط نسبة التشابه بالدفعة</span>
+                        <h3 id="statAvgSim" class="stat-value">0%</h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Single Document Notice Banner -->
+            <div id="singleDocBanner" style="display: none; background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.4); color: #bae6fd; padding: 0.85rem 1.25rem; border-radius: 10px; margin-bottom: 1.5rem; font-size: 0.95rem;">
+            </div>
+
+            <!-- View Tabs -->
+            <div class="views-tabs-nav">
+                <button class="view-tab-btn active" onclick="switchView('leaderboard')">
+                    <i class="fa-solid fa-ranking-star"></i> <span data-i18n="tab_leaderboard">ترتيب الأبحاث ونسب التشابه</span>
+                </button>
+                <button class="view-tab-btn" onclick="switchView('greenpass')">
+                    <i class="fa-solid fa-certificate"></i> <span>تصاريح التسليم الآمن (Green Pass)</span>
+                </button>
+                <button class="view-tab-btn" onclick="switchView('tableaudit')">
+                    <i class="fa-solid fa-table"></i> <span>كاشف فخ الجداول (Tables Audit)</span>
+                </button>
+                <button class="view-tab-btn" onclick="switchView('turnitin')">
+                    <i class="fa-solid fa-shield-halved"></i> <span data-i18n="tab_turnitin">محاكاة تقرير Turnitin الرسمي</span>
+                </button>
+                <button class="view-tab-btn" onclick="switchView('actions')">
+                    <i class="fa-solid fa-pen-to-square"></i> <span data-i18n="tab_actions">الجمل المطلوب تعديلها (قائمة العمل)</span>
+                </button>
+                <button class="view-tab-btn" onclick="switchView('inspector')">
+                    <i class="fa-solid fa-highlighter"></i> <span data-i18n="tab_inspector">فحص وتظليل البحث (Full Inspector)</span>
+                </button>
+                <button class="view-tab-btn" onclick="switchView('matrix')">
+                    <i class="fa-solid fa-table-cells"></i> <span data-i18n="tab_matrix">مصفوفة التشابه المتبادل (Matrix)</span>
+                </button>
+                <button class="view-tab-btn" onclick="switchView('compare')">
+                    <i class="fa-solid fa-columns"></i> <span data-i18n="tab_compare">مقارنة بحثين جنباً إلى جنب</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: Leaderboard Table -->
+            <div id="viewLeaderboard" class="view-panel active">
+                <div class="card">
+                    <div class="card-header justify-between">
+                        <h3><i class="fa-solid fa-list-ol"></i> <span data-i18n="leaderboard_title">قائمة الأبحاث مرتبة من الأعلى خطورة إلى الآمن</span></h3>
+                        <div class="filter-box">
+                            <i class="fa-solid fa-search"></i>
+                            <input type="text" id="leaderboardSearch" class="form-control form-control-sm" placeholder="بحث بالاسم..." oninput="filterLeaderboard()">
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table" id="leaderboardTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 50px;">#</th>
+                                        <th data-i18n="col_filename">اسم البحث / الملف</th>
+                                        <th style="width: 170px;" data-i18n="col_similarity">نسبة التشابه (Turnitin %)</th>
+                                        <th style="width: 120px;" data-i18n="col_risk">مستوى الخطورة</th>
+                                        <th style="width: 120px;" data-i18n="col_sentences">الجمل المقتبسة</th>
+                                        <th data-i18n="col_top_sources">أهم الأبحاث المشتركة معه</th>
+                                        <th style="width: 180px;" data-i18n="col_actions">إجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="leaderboardBody">
+                                    <!-- Rendered by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB GREEN PASS: Pre-Submission Readiness Certificate -->
+            <div id="viewGreenPass" class="view-panel">
+                <div class="card">
+                    <div class="card-header justify-between">
+                        <div>
+                            <h3><i class="fa-solid fa-certificate text-success"></i> <span>تصاريح الضوء الأخضر للتسليم (Pre-Submission Green Pass)</span></h3>
+                            <p class="card-subtitle">الدرع الواقي لمنع قفز النسبة إلى 80%: يحدد بدقة الأبحاث الجاهزة للتسليم للعملاء فوراً والأبحاث الممنوع تسليمها قبل تعديل الجمل المتطابقة.</p>
+                        </div>
+                        <div id="batchReadinessBadge"></div>
+                    </div>
+                    <div class="card-body">
+                        <div id="greenPassCardsGrid" class="greenpass-grid">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB TABLE AUDIT: Shared Tables & Matrices Detector -->
+            <div id="viewTableAudit" class="view-panel">
+                <div class="card">
+                    <div class="card-header justify-between">
+                        <div>
+                            <h3><i class="fa-solid fa-table-cells-large text-warning"></i> <span>فحص الجداول والمصفوفات المشتركة (Table & Template Trap)</span></h3>
+                            <p class="card-subtitle">فخ الجداول هو السبب رقم 1 لارتفاع الاقتباس للـ 80% في Turnitin (مثل جداول الـ Stakeholders و Priority Matrix). يتم كشف أي تطابق في محتوى الجداول وتنبيه الكاتب لتغيير أرقامه وبياناته.</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="tableAuditContainer">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB TURNITIN: Turnitin Official Simulation -->
+            <div id="viewTurnitin" class="view-panel">
+                <div class="card">
+                    <div class="card-header justify-between">
+                        <div>
+                            <h3><i class="fa-solid fa-shield-halved"></i> <span>محاكاة دقيقة لتقرير Turnitin الرسمي (Similarity Index)</span></h3>
+                            <p class="card-subtitle">توضح نسبة الاقتباس المتوقعة عند رفع الأبحاث معاً إلى منصة الجامعة وتفصيل مصادرها (أعمال طلاب / إنترنت / منشورات)</p>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="turnitinCardsGrid" class="turnitin-grid">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: Action List (Sentences to change) -->
+            <div id="viewActions" class="view-panel">
+                <div class="card">
+                    <div class="card-header justify-between">
+                        <div>
+                            <h3><i class="fa-solid fa-list-check"></i> <span data-i18n="actions_title">الجمل التي يجب إعادة صياغتها لتفادي كشف المنصة</span></h3>
+                            <p class="card-subtitle" data-i18n="actions_sub">قائمة منظمة بكل جملة مشتركة مع غيرها، مع إمكانية الفلترة لكل بحث على حدة وتصديرها للكاتب</p>
+                        </div>
+                        <div class="actions-filters">
+                            <select id="actionDocFilter" class="form-control form-control-sm" onchange="renderActionList()">
+                                <option value="all">كل الأبحاث (All Documents)</option>
+                            </select>
+                            <select id="actionTypeFilter" class="form-control form-control-sm" onchange="renderActionList()">
+                                <option value="all">كل أنواع التطابق</option>
+                                <option value="exact">تطابق تام (100% Exact)</option>
+                                <option value="fuzzy">إعادة صياغة جزئية (Fuzzy)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="actionListContainer" class="action-cards-list">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: Document Inspector (Full text with highlights) -->
+            <div id="viewInspector" class="view-panel">
+                <div class="card">
+                    <div class="card-header justify-between">
+                        <div class="doc-select-bar">
+                            <label><b data-i18n="select_inspect_doc">اختر البحث لعرضه وتظليله:</b></label>
+                            <select id="inspectorDocSelect" class="form-control" onchange="loadDocumentForInspection(this.value)">
+                                <!-- Filled by JS -->
+                            </select>
+                        </div>
+                        <div id="inspectorStatsBadge"></div>
+                    </div>
+                    <div class="card-body inspector-layout">
+                        <!-- Left/Right: Document Content -->
+                        <div class="inspector-document-box" id="inspectorTextContainer">
+                            <p class="text-muted text-center py-5" data-i18n="select_doc_msg">اختر بحثاً من القائمة أعلاه لعرض نصه الكامل وتظليل الجمل المقتبسة</p>
+                        </div>
+
+                        <!-- Match Detail Sidebar / Floating Inspector -->
+                        <div class="inspector-details-box" id="matchDetailsSidebar">
+                            <div class="sidebar-header-tabs">
+                                <button class="sidebar-tab-btn active" id="tabSourcesBtn" onclick="switchInspectorSidebarTab('sources')">
+                                    <i class="fa-solid fa-layer-group"></i> <span>أهم المصادر</span>
+                                </button>
+                                <button class="sidebar-tab-btn" id="tabMatchesBtn" onclick="switchInspectorSidebarTab('matches')">
+                                    <i class="fa-solid fa-list-check"></i> <span id="sidebarMatchesCountText">كل الجمل</span>
+                                </button>
+                                <button class="sidebar-tab-btn" id="tabSelectedBtn" onclick="switchInspectorSidebarTab('selected')">
+                                    <i class="fa-solid fa-circle-info"></i> <span>تفاصيل الجملة</span>
+                                </button>
+                            </div>
+                            
+                            <!-- Panel 1: Top Sources -->
+                            <div id="inspectorSourcesPanel" class="inspector-tab-panel active">
+                                <div id="inspectorTopSourcesList" class="inspector-sources-list"></div>
+                            </div>
+
+                            <!-- Panel 2: All Matches List -->
+                            <div id="inspectorMatchesPanel" class="inspector-tab-panel">
+                                <div id="inspectorAllMatchesList" class="inspector-all-matches-list"></div>
+                            </div>
+
+                            <!-- Panel 3: Selected Sentence Details -->
+                            <div id="inspectorSelectedPanel" class="inspector-tab-panel">
+                                <div id="matchDetailsContent" class="match-details-body">
+                                    <p class="text-muted" data-i18n="click_sentence_hint">اضغط على أي جملة مظللة في النص أو اختر جملة من قائمة الجمل لعرض تفاصيلها ومصادرها وخيارات إعادة صياغتها.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: Similarity Matrix -->
+            <div id="viewMatrix" class="view-panel">
+                <div class="card">
+                    <div class="card-header justify-between">
+                        <div>
+                            <h3><i class="fa-solid fa-border-all"></i> <span data-i18n="matrix_title">مصفوفة التشابه المتبادل (Cross-Similarity Matrix)</span></h3>
+                            <p class="card-subtitle" data-i18n="matrix_sub">توضح نسبة الكلمات المشتركة بين كل بحث والآخر مباشرة</p>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive matrix-container" id="matrixContainer">
+                            <!-- Rendered by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: Side-by-Side Comparison -->
+            <div id="viewCompare" class="view-panel">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="compare-selectors">
+                            <div class="selector-group">
+                                <label><i class="fa-solid fa-file"></i> <span data-i18n="compare_doc1">البحث الأول:</span></label>
+                                <select id="compareDoc1" class="form-control" onchange="runSideBySideCompare()"></select>
+                            </div>
+                            <div class="compare-icon"><i class="fa-solid fa-arrows-left-right"></i></div>
+                            <div class="selector-group">
+                                <label><i class="fa-solid fa-file"></i> <span data-i18n="compare_doc2">البحث الثاني:</span></label>
+                                <select id="compareDoc2" class="form-control" onchange="runSideBySideCompare()"></select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="compareResultContainer">
+                            <p class="text-muted text-center py-4" data-i18n="compare_select_hint">اختر بحثين من القائمة أعلاه لمشاهدة الجمل المتطابقة بينهما مباشرة.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Cross-Similarity & Plagiarism Engine &bull; فاحص الاقتباس الداخلي للأبحاث والواجبات الجامعية &bull; Built for High-Volume Academic Accuracy</p>
+    </footer>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

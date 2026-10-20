@@ -1,0 +1,25 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary / Scratch scripts
+scratch/
+test_web.py
+test_scan.py
+inspect_doc.py
+check_matches.py
+step241_rep.txt
+test_report.xlsx
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Virtual environments
+venv/
+env/
+.env
